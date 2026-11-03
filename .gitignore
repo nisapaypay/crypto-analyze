@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+src/generated/
+
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store
+
+# Backtest history (Milestone 4)
+data/backtest/

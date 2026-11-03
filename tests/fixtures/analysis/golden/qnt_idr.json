@@ -1,0 +1,212 @@
+{
+  "engineVersion": "3.0.0",
+  "main": {
+    "timeframe": "15",
+    "unavailableReason": null,
+    "candleCount": 300,
+    "windowStart": "2026-10-30T07:15:00.000Z",
+    "lastCandleOpen": "2026-11-02T10:00:00.000Z",
+    "close": "3586224",
+    "ema9": {
+      "value": "3588198.8728528290097857015711821801172955480599242",
+      "reliability": "andal",
+      "notes": []
+    },
+    "ema20": {
+      "value": "3597199.4119131204570514316848416118289028812836374",
+      "reliability": "andal",
+      "notes": []
+    },
+    "ema50": {
+      "value": "3615090.5128966944966317765992867976731365478997192",
+      "reliability": "andal",
+      "notes": []
+    },
+    "stack": {
+      "value": "turun",
+      "reliability": "andal",
+      "notes": []
+    },
+    "closeVsEma20Pct": "-0.3051099106925333598195345972123070923293557746031",
+    "closeVsEma50Pct": "-0.7985004191102363004413052276850153694727424838456",
+    "ema20SlopePct": {
+      "value": "-0.13528801057369245140780780474516498063137968481341",
+      "reliability": "andal",
+      "notes": []
+    },
+    "crossover": null,
+    "rsi14": {
+      "value": "43.689654365641584618951670999735462147925208339927",
+      "reliability": "andal",
+      "notes": []
+    },
+    "rsiLabel": "momentum lemah"
+  },
+  "trend": {
+    "timeframe": "60",
+    "unavailableReason": null,
+    "candleCount": 300,
+    "windowStart": "2026-10-20T22:00:00.000Z",
+    "lastCandleOpen": "2026-11-02T09:00:00.000Z",
+    "close": "3584753",
+    "ema9": {
+      "value": "3608806.2881915728734542080735810919452273798164503",
+      "reliability": "andal",
+      "notes": []
+    },
+    "ema20": {
+      "value": "3620463.8333616413146228473639606048152554864084291",
+      "reliability": "andal",
+      "notes": []
+    },
+    "ema50": {
+      "value": "3607283.0441747442570778048353768270334106881701656",
+      "reliability": "andal",
+      "notes": []
+    },
+    "stack": {
+      "value": "campuran",
+      "reliability": "andal",
+      "notes": []
+    },
+    "closeVsEma20Pct": "-0.98636072628526729230789855409887880458574680192745",
+    "closeVsEma50Pct": "-0.62457101089217592055684463906683733655803963214615",
+    "ema20SlopePct": {
+      "value": "-0.42932676374096584169296725878931321401165997435111",
+      "reliability": "andal",
+      "notes": []
+    },
+    "crossover": null,
+    "rsi14": {
+      "value": "44.161515008745350361026039060230867392424175334368",
+      "reliability": "andal",
+      "notes": []
+    },
+    "rsiLabel": "momentum lemah"
+  },
+  "volatility": {
+    "atr14": {
+      "value": "21824.105430802792180666182762640512099583156843363",
+      "reliability": "andal",
+      "notes": []
+    },
+    "atr14Pct": "0.60855388371732474548902084093577289370611419820298",
+    "atr14Traded": {
+      "value": "22077.577651494308133871760944691960896570218855645",
+      "reliability": "andal",
+      "notes": []
+    },
+    "zeroVolumeCount": 0
+  },
+  "volume": {
+    "stats": {
+      "current": "8.82421422",
+      "ma": "1.8046100065",
+      "maTraded": "1.8046100065",
+      "ratio": "4.8898178488516543643580865847315692583133196762533",
+      "ratioTraded": "4.8898178488516543643580865847315692583133196762533",
+      "zeroCount": 0,
+      "window": 20
+    },
+    "ratio": {
+      "value": "4.8898178488516543643580865847315692583133196762533",
+      "reliability": "andal",
+      "notes": []
+    },
+    "label": "lonjakan"
+  },
+  "levels": {
+    "reliability": "andal",
+    "notes": [],
+    "reference": "3586224",
+    "supports": [
+      {
+        "zone": {
+          "low": "3564247",
+          "high": "3575106",
+          "touches": 6,
+          "swingHighs": 3,
+          "swingLows": 3,
+          "firstPivotAt": "2026-10-30T15:15:00.000Z",
+          "lastPivotAt": "2026-11-02T07:45:00.000Z",
+          "lastConfirmedAt": "2026-11-02T08:30:00.000Z",
+          "candlesSinceConfirmed": 6,
+          "freshness": "baru"
+        },
+        "distance": "11118",
+        "distancePct": "0.31001967529077938243679145530229009677030771084015",
+        "distanceAtr": "0.50943668849344576365222351380268552170518069877812"
+      },
+      {
+        "zone": {
+          "low": "3549551",
+          "high": "3550002",
+          "touches": 2,
+          "swingHighs": 1,
+          "swingLows": 1,
+          "firstPivotAt": "2026-10-30T13:15:00.000Z",
+          "lastPivotAt": "2026-10-31T22:00:00.000Z",
+          "lastConfirmedAt": "2026-10-31T22:45:00.000Z",
+          "candlesSinceConfirmed": 141,
+          "freshness": "lama"
+        },
+        "distance": "36222",
+        "distancePct": "1.0100317213871749227042147952832840335684552889055",
+        "distanceAtr": "1.6597243866351495278836877241375134886854699830132"
+      }
+    ],
+    "resistances": [
+      {
+        "zone": {
+          "low": "3597647",
+          "high": "3602136",
+          "touches": 4,
+          "swingHighs": 0,
+          "swingLows": 4,
+          "firstPivotAt": "2026-11-01T10:30:00.000Z",
+          "lastPivotAt": "2026-11-02T05:00:00.000Z",
+          "lastConfirmedAt": "2026-11-02T05:45:00.000Z",
+          "candlesSinceConfirmed": 17,
+          "freshness": "lama"
+        },
+        "distance": "11423",
+        "distancePct": "0.31852444242188998790928843262439825286987092830788",
+        "distanceAtr": "0.52341206086172251827660992967872609412109004516482"
+      },
+      {
+        "zone": {
+          "low": "3608726",
+          "high": "3615098",
+          "touches": 5,
+          "swingHighs": 1,
+          "swingLows": 4,
+          "firstPivotAt": "2026-10-30T09:30:00.000Z",
+          "lastPivotAt": "2026-11-02T01:00:00.000Z",
+          "lastConfirmedAt": "2026-11-02T01:45:00.000Z",
+          "candlesSinceConfirmed": 33,
+          "freshness": "lama"
+        },
+        "distance": "22502",
+        "distancePct": "0.6274566228991830962036950285314023886963000637997",
+        "distanceAtr": "1.0310617345277492870752233771890654442714495488312"
+      }
+    ],
+    "inside": [
+      {
+        "low": "3576767",
+        "high": "3586404",
+        "touches": 4,
+        "swingHighs": 2,
+        "swingLows": 2,
+        "firstPivotAt": "2026-10-31T01:30:00.000Z",
+        "lastPivotAt": "2026-11-01T17:30:00.000Z",
+        "lastConfirmedAt": "2026-11-01T18:15:00.000Z",
+        "candlesSinceConfirmed": 63,
+        "freshness": "lama"
+      }
+    ],
+    "pivotCount": 58,
+    "rangeHigh": "3700000",
+    "rangeLow": "3564247"
+  }
+}

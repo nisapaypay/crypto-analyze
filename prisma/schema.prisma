@@ -1,0 +1,310 @@
+// Database schema for the Crypto Analyst (PRD §14).
+// Monetary and price values use Decimal to avoid floating point errors.
+// Percentages are stored as human-readable percent values (0.5 = 0.5%).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SignalDecision {
+  BUY_CANDIDATE
+  EARLY_WARNING
+  WAIT
+  NO_TRADE
+  DATA_UNAVAILABLE
+}
+
+enum DataQualityStatus {
+  OK
+  DEGRADED
+  UNAVAILABLE
+}
+
+enum PositionStatus {
+  OPEN
+  CLOSED
+}
+
+enum ScanStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  telegramUserId BigInt   @unique @map("telegram_user_id")
+  username       String?
+  timezone       String   @default("Asia/Jakarta")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  settings  UserSettings?
+  watchlist WatchlistItem[]
+  positions Position[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+model UserSettings {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @unique @map("user_id")
+  capital             Decimal  @db.Decimal(20, 2)
+  riskPerTrade        Decimal  @map("risk_per_trade") @db.Decimal(6, 3)
+  dailyLossLimit      Decimal  @map("daily_loss_limit") @db.Decimal(6, 3)
+  maxDailyTrades      Int      @map("max_daily_trades")
+  maxActivePositions  Int      @map("max_active_positions")
+  activeHoursStart    String   @map("active_hours_start")
+  activeHoursEnd      String   @map("active_hours_end")
+  scanningEnabled     Boolean  @default(true) @map("scanning_enabled")
+  scanIntervalMinutes Int      @map("scan_interval_minutes")
+  mainTimeframe       String   @map("main_timeframe")
+  entryTimeframe      String   @map("entry_timeframe")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Milestone 4 cost assumptions (percent; null = code default). Taxes are
+  // settings only, never hard-coded in formulas, and unverified by default.
+  buyFeePct           Decimal? @map("buy_fee_pct") @db.Decimal(8, 4)
+  sellFeePct          Decimal? @map("sell_fee_pct") @db.Decimal(8, 4)
+  buyTaxPct           Decimal? @map("buy_tax_pct") @db.Decimal(8, 4)
+  sellTaxPct          Decimal? @map("sell_tax_pct") @db.Decimal(8, 4)
+  entrySlippagePct    Decimal? @map("entry_slippage_pct") @db.Decimal(8, 4)
+  stopSlippagePct     Decimal? @map("stop_slippage_pct") @db.Decimal(8, 4)
+  tpSlippagePct       Decimal? @map("tp_slippage_pct") @db.Decimal(8, 4)
+  costsVerified       Boolean  @default(false) @map("costs_verified")
+  maxPositionAllocPct Decimal? @map("max_position_alloc_pct") @db.Decimal(6, 3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model WatchlistItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  /// Indodax ticker_id format, e.g. "qnt_idr".
+  pair      String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pair])
+  @@map("watchlist")
+}
+
+model Candle {
+  id        BigInt   @id @default(autoincrement())
+  pair      String
+  /// Indodax timeframe code, e.g. "1", "15", "60".
+  timeframe String
+  openTime  DateTime @map("open_time")
+  open      Decimal  @db.Decimal(38, 12)
+  high      Decimal  @db.Decimal(38, 12)
+  low       Decimal  @db.Decimal(38, 12)
+  close     Decimal  @db.Decimal(38, 12)
+  volume    Decimal  @db.Decimal(38, 12)
+
+  @@unique([pair, timeframe, openTime])
+  @@map("candles")
+}
+
+model MarketSnapshot {
+  id            BigInt   @id @default(autoincrement())
+  pair          String
+  /// When the data was fetched (local clock).
+  timestamp     DateTime
+  lastPrice     Decimal  @map("last_price") @db.Decimal(38, 12)
+  bestBid       Decimal  @map("best_bid") @db.Decimal(38, 12)
+  bestAsk       Decimal  @map("best_ask") @db.Decimal(38, 12)
+  /// Spread in IDR (best ask − best bid).
+  spread        Decimal  @db.Decimal(38, 12)
+  orderBookData Json     @map("order_book_data")
+
+  // Milestone 2 (additive, nullable)
+  /// Ticker server_time reported by Indodax.
+  serverTime      DateTime?          @map("server_time")
+  /// Order book age at fetch time, incl. Cloudflare cache age.
+  orderBookAgeSec Int?               @map("order_book_age_sec")
+  /// Spread relative to the mid price, in percent.
+  spreadPct       Decimal?           @map("spread_pct") @db.Decimal(20, 8)
+  high24h         Decimal?           @map("high_24h") @db.Decimal(38, 12)
+  low24h          Decimal?           @map("low_24h") @db.Decimal(38, 12)
+  volumeBase24h   Decimal?           @map("volume_base_24h") @db.Decimal(38, 12)
+  volumeIdr24h    Decimal?           @map("volume_idr_24h") @db.Decimal(38, 12)
+  tradeActivity   Json?              @map("trade_activity")
+  qualityStatus   DataQualityStatus? @map("quality_status")
+  qualityIssues   Json?              @map("quality_issues")
+
+  @@index([pair, timestamp])
+  @@map("market_snapshots")
+}
+
+/// Milestone 3: indicator values computed from final candles only.
+/// One row per (pair, timeframe, last final candle, engine version), so a
+/// result can always be recomputed and compared. Order book imbalance lives
+/// in market_snapshots (it changes on every fetch) and is linked by id.
+model IndicatorSnapshot {
+  id                BigInt            @id @default(autoincrement())
+  pair              String
+  timeframe         String
+  /// Open time of the last final candle used.
+  candleOpenTime    DateTime          @map("candle_open_time")
+  windowStart       DateTime          @map("window_start")
+  windowSize        Int               @map("window_size")
+  engineVersion     String            @map("engine_version")
+  computedAt        DateTime          @map("computed_at")
+  marketSnapshotId  BigInt?           @map("market_snapshot_id")
+  qualityStatus     DataQualityStatus @map("quality_status")
+  close             Decimal?          @db.Decimal(38, 12)
+  ema9              Decimal?          @db.Decimal(38, 12)
+  ema20             Decimal?          @db.Decimal(38, 12)
+  ema50             Decimal?          @db.Decimal(38, 12)
+  rsi14             Decimal?          @db.Decimal(20, 12)
+  atr14             Decimal?          @db.Decimal(38, 12)
+  atr14Traded       Decimal?          @map("atr14_traded") @db.Decimal(38, 12)
+  atr14Pct          Decimal?          @map("atr14_pct") @db.Decimal(20, 12)
+  volumeLast        Decimal?          @map("volume_last") @db.Decimal(38, 12)
+  volumeMa20        Decimal?          @map("volume_ma20") @db.Decimal(38, 12)
+  volumeMa20Traded  Decimal?          @map("volume_ma20_traded") @db.Decimal(38, 12)
+  volumeRatio       Decimal?          @map("volume_ratio") @db.Decimal(20, 12)
+  volumeRatioTraded Decimal?          @map("volume_ratio_traded") @db.Decimal(20, 12)
+  zeroVolumeCount20 Int?              @map("zero_volume_count_20")
+  supports          Json?
+  resistances       Json?
+  /// Readings with reliability, notes and descriptive labels.
+  interpretation    Json
+  issues            Json
+
+  @@unique([pair, timeframe, candleOpenTime, engineVersion])
+  @@index([pair, timeframe, candleOpenTime])
+  @@map("indicator_snapshots")
+}
+
+model TradingSignal {
+  id                Int            @id @default(autoincrement())
+  pair              String
+  decision          SignalDecision
+  signalScore       Decimal?       @map("signal_score") @db.Decimal(10, 4)
+  indicatorSnapshot Json           @map("indicator_snapshot")
+  entryMin          Decimal?       @map("entry_min") @db.Decimal(38, 12)
+  entryMax          Decimal?       @map("entry_max") @db.Decimal(38, 12)
+  stopLoss          Decimal?       @map("stop_loss") @db.Decimal(38, 12)
+  takeProfit        Decimal?       @map("take_profit") @db.Decimal(38, 12)
+  estimatedRisk     Decimal?       @map("estimated_risk") @db.Decimal(20, 2)
+  estimatedReward   Decimal?       @map("estimated_reward") @db.Decimal(20, 2)
+  status            String
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  // Milestone 4 (all nullable/defaulted: additive only).
+  engineVersion     String?                 @map("engine_version")
+  regime            String?
+  candleOpenTime    DateTime?               @map("candle_open_time")
+  marketSnapshotId  BigInt?                 @map("market_snapshot_id")
+  quantity          Decimal?                @db.Decimal(38, 12)
+  entryFeeEst       Decimal?                @map("entry_fee_est") @db.Decimal(20, 2)
+  exitFeeEst        Decimal?                @map("exit_fee_est") @db.Decimal(20, 2)
+  taxEst            Decimal?                @map("tax_est") @db.Decimal(20, 2)
+  slippageEst       Decimal?                @map("slippage_est") @db.Decimal(20, 2)
+  netRr             Decimal?                @map("net_rr") @db.Decimal(20, 6)
+  /// Planned maximum net loss reserved by a BUY_CANDIDATE. Set once at issue,
+  /// never re-added on lifecycle changes.
+  reservedRisk      Decimal?                @map("reserved_risk") @db.Decimal(20, 2)
+  gates             Json?
+  reasons           Json?
+  costAssumptions   Json?                   @map("cost_assumptions")
+  expiresAt         DateTime?               @map("expires_at")
+  /// Market-observed lifecycle of a BUY_CANDIDATE (never the user's actions).
+  lifecycleStatus   SignalLifecycleStatus?  @map("lifecycle_status")
+  lifecycleAt       DateTime?               @map("lifecycle_at")
+  /// Whether the user executed it. Always UNKNOWN until the M6 journal exists.
+  executionStatus   SignalExecutionStatus   @default(UNKNOWN) @map("execution_status")
+  /// Hypothetical (paper) outcome; never the user's P/L.
+  hypoResult        Json?                   @map("hypo_result")
+
+  @@unique([pair, candleOpenTime, engineVersion])
+  @@index([pair, createdAt])
+  @@index([decision, createdAt])
+  @@map("trading_signals")
+}
+
+enum SignalLifecycleStatus {
+  ACTIVE
+  EXPIRED_UNFILLED
+  POSSIBLY_FILLED
+  HYPO_CLOSED
+}
+
+enum SignalExecutionStatus {
+  UNKNOWN
+  TAKEN
+  NOT_TAKEN
+}
+
+model Position {
+  id             Int            @id @default(autoincrement())
+  userId         Int            @map("user_id")
+  pair           String
+  quantity       Decimal        @db.Decimal(38, 12)
+  averageEntry   Decimal        @map("average_entry") @db.Decimal(38, 12)
+  averageExit    Decimal?       @map("average_exit") @db.Decimal(38, 12)
+  positionStatus PositionStatus @default(OPEN) @map("position_status")
+  openedAt       DateTime       @default(now()) @map("opened_at")
+  closedAt       DateTime?      @map("closed_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades Trade[]
+
+  @@index([userId, positionStatus])
+  @@map("positions")
+}
+
+model Trade {
+  id         Int      @id @default(autoincrement())
+  positionId Int      @map("position_id")
+  entryPrice Decimal  @map("entry_price") @db.Decimal(38, 12)
+  exitPrice  Decimal  @map("exit_price") @db.Decimal(38, 12)
+  quantity   Decimal  @db.Decimal(38, 12)
+  grossPnl   Decimal  @map("gross_pnl") @db.Decimal(20, 2)
+  fees       Decimal  @db.Decimal(20, 2)
+  netPnl     Decimal  @map("net_pnl") @db.Decimal(20, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@map("trades")
+}
+
+model ScheduledScan {
+  id          Int        @id @default(autoincrement())
+  /// Null means a full watchlist scan.
+  pair        String?
+  scheduledAt DateTime   @map("scheduled_at")
+  status      ScanStatus @default(PENDING)
+  retryCount  Int        @default(0) @map("retry_count")
+
+  @@index([status, scheduledAt])
+  @@map("scheduled_scans")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  /// Null for events from unknown/unauthorized Telegram users.
+  userId    Int?     @map("user_id")
+  action    String
+  details   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}

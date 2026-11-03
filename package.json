@@ -1,0 +1,55 @@
+{
+  "name": "crypto-analyst",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal Agentic AI Crypto Analyst for Indodax (analysis only, no order execution)",
+  "type": "module",
+  "packageManager": "pnpm@9.14.4",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev && prisma generate",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:test:prepare": "tsx scripts/prepare-test-db.ts",
+    "market:check": "tsx scripts/market-check.ts",
+    "analysis:check": "tsx scripts/analysis-check.ts",
+    "strategy:check": "tsx scripts/strategy-check.ts",
+    "backtest:fetch": "tsx scripts/backtest-fetch.ts",
+    "backtest": "tsx scripts/backtest.ts",
+    "settings:costs": "tsx scripts/settings-costs.ts"
+  },
+  "dependencies": {
+    "@grammyjs/ratelimiter": "1.2.1",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "decimal.js": "10.6.0",
+    "dotenv": "18.0.9",
+    "grammy": "1.46.0",
+    "pg": "8.23.1",
+    "pino": "10.4.0",
+    "prisma": "7.10.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "eslint": "10.14.0",
+    "pino-pretty": "13.2.0",
+    "technicalindicators": "3.1.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.0.5"
+  }
+}
