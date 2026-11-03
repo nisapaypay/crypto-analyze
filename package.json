@@ -26,7 +26,8 @@
     "strategy:check": "tsx scripts/strategy-check.ts",
     "backtest:fetch": "tsx scripts/backtest-fetch.ts",
     "backtest": "tsx scripts/backtest.ts",
-    "settings:costs": "tsx scripts/settings-costs.ts"
+    "settings:costs": "tsx scripts/settings-costs.ts",
+    "soak:report": "tsx scripts/soak-report.ts"
   },
   "dependencies": {
     "@grammyjs/ratelimiter": "1.2.1",

@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AuditEntry } from '../../src/app/audit/audit-log.js';
 import { createLogger } from '../../src/app/logger/logger.js';
 import { createBot, type BotDeps } from '../../src/bot/bot.js';
+import { PAUSED_MESSAGE, RESUMED_MESSAGE } from '../../src/bot/commands/scheduler.js';
+import { InMemorySchedulerControl } from '../../src/scheduler/scheduler-settings.js';
 import { InMemoryIndicatorRepository } from '../../src/analysis/indicator-repository.js';
 import { TechnicalAnalysisService } from '../../src/analysis/technical-analysis-service.js';
 import { MarketDataService } from '../../src/market/market-data-service.js';
@@ -236,8 +238,46 @@ describe('commands', () => {
 
   it('upcoming commands reply with their planned milestone', async () => {
     const { bot, replies } = setup();
+    await bot.handleUpdate(messageUpdate('/bought'));
+    expect(replies()[0]).toBe('Perintah /bought belum tersedia (direncanakan di Milestone 6).');
+  });
+
+  it('/pause and /resume toggle only the scanning flag and are audited (Milestone 5)', async () => {
+    const control = new InMemorySchedulerControl({ scanningEnabled: true, intervalMinutes: 15, activeHours: { start: '09:00', end: '22:00' } });
+    const { bot, replies, auditEntries } = setup({ schedulerControl: control });
     await bot.handleUpdate(messageUpdate('/pause'));
-    expect(replies()[0]).toBe('Perintah /pause belum tersedia (direncanakan di Milestone 5).');
+    expect(control.settings.scanningEnabled).toBe(false);
+    expect(replies()[0]).toBe(PAUSED_MESSAGE);
+    expect(replies()[0]).toContain('pengumpulan data pasar 24/7');
+    await bot.handleUpdate(messageUpdate('/resume'));
+    expect(control.settings.scanningEnabled).toBe(true);
+    expect(replies()[1]).toBe(RESUMED_MESSAGE);
+    expect(auditEntries.map((e) => e.action)).toEqual(expect.arrayContaining(['scheduler.paused', 'scheduler.resumed']));
+  });
+
+  it('/status shows the scheduler, clock and request budget (Milestone 5)', async () => {
+    const { bot, replies } = setup({
+      schedulerStatus: async () => ({
+        running: true,
+        paused: false,
+        lockHeld: true,
+        clock: { status: 'INVALID', skewMs: 45_000, checkedAt: null },
+        nextSlotAt: new Date('2026-11-02T04:31:30Z'),
+        nextSlotKind: 'STRATEGY_SCAN',
+        lastRun: { kind: 'STRATEGY_SCAN', status: 'SKIPPED', slotAt: new Date('2026-11-02T04:16:30Z'), cause: 'CLOCK_SKEW' },
+        consecutiveFailures: 0,
+        breakerOpen: false,
+        requests: { lastHour: 87, peakPerMinute: 21, limitPerMinute: 120 },
+      }),
+    });
+    await bot.handleUpdate(messageUpdate('/status'));
+    const text = replies()[0]!;
+    expect(text).toContain('SCHEDULER');
+    expect(text).toContain('Jam: TIDAK VALID — keputusan & penyimpanan data ditahan (selisih 45.0 dtk)');
+    expect(text).toContain('Slot berikutnya: 11:31 WIB (scan strategi)');
+    expect(text).toContain('SKIPPED (CLOCK_SKEW)');
+    expect(text).toContain('Request Indodax: 87/jam · puncak 21/menit (batas 120)');
+    expect(text).not.toContain('belum aktif (Milestone 5)');
   });
 
   it('unknown text gets a help hint', async () => {

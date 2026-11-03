@@ -4,9 +4,10 @@ import type { UserFromGetMe } from 'grammy/types';
 import type { ComponentHealth } from '../app/health/health-service.js';
 import { registerAnalyzeCommand, type AnalyzeCommandDeps } from './commands/analyze.js';
 import { COMMANDS } from './commands/registry.js';
+import { registerSchedulerCommands, type SchedulerCommandDeps } from './commands/scheduler.js';
 import { registerStrategyCommands, type StrategyCommandDeps } from './commands/strategy.js';
 import { registerWatchlistCommands, type WatchlistCommandDeps } from './commands/watchlist.js';
-import { helpMessage, notAvailableMessage, startMessage, statusMessage } from './messages/messages.js';
+import { helpMessage, notAvailableMessage, startMessage, statusMessage, type SchedulerStatusView } from './messages/messages.js';
 import { authGuard } from './middleware/auth.js';
 
 export interface BotDeps extends Omit<WatchlistCommandDeps, 'clock' | 'analysis'> {
@@ -15,6 +16,9 @@ export interface BotDeps extends Omit<WatchlistCommandDeps, 'clock' | 'analysis'
   strategy: StrategyCommandDeps['strategy'] & NonNullable<AnalyzeCommandDeps['strategy']>;
   health: { check(): Promise<ComponentHealth[]> };
   ai: { enabled: boolean; disabledReason?: string | undefined };
+  /** Milestone 5: /pause, /resume and the scheduler part of /status (absent in tests of earlier milestones). */
+  schedulerControl?: SchedulerCommandDeps['schedulerControl'];
+  schedulerStatus?: () => Promise<SchedulerStatusView>;
   clock?: () => Date;
   /** Pre-supplied bot info skips the getMe call (used in tests). */
   botInfo?: UserFromGetMe;
@@ -57,12 +61,14 @@ export function createBot(deps: BotDeps): Bot {
 
   bot.command('status', async (ctx) => {
     const components = await deps.health.check();
-    await ctx.reply(statusMessage({ now: clock(), timeZone: deps.timeZone, components, ai: deps.ai }));
+    const scheduler = deps.schedulerStatus ? await deps.schedulerStatus().catch(() => undefined) : undefined;
+    await ctx.reply(statusMessage({ now: clock(), timeZone: deps.timeZone, components, ai: deps.ai, scheduler }));
   });
 
   registerWatchlistCommands(bot, { ...deps, clock });
   registerAnalyzeCommand(bot, { ...deps, clock });
   registerStrategyCommands(bot, { ...deps, clock });
+  if (deps.schedulerControl) registerSchedulerCommands(bot, { ...deps, schedulerControl: deps.schedulerControl });
 
   for (const info of COMMANDS.filter((c) => c.plannedMilestone !== null)) {
     bot.command(info.command, (ctx) => ctx.reply(notAvailableMessage(info)));

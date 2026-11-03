@@ -37,6 +37,51 @@ enum ScanStatus {
   COMPLETED
   FAILED
   CANCELLED
+  // Milestone 5
+  /// Deliberately not run (paused, clock not valid, circuit breaker).
+  SKIPPED
+  /// Process stopped while the run was in progress.
+  INTERRUPTED
+  /// The slot passed without the process running it (offline, sleep, late).
+  MISSED
+}
+
+/// Milestone 5: what a scheduler run does.
+enum ScanKind {
+  /// Active hours: strategy scan (refresh + M4 decision) on a 15m candle close.
+  STRATEGY_SCAN
+  /// Outside active hours / between strategy slots: market data only, no decisions.
+  COLLECT
+  /// 1-minute monitoring of an ACTIVE BUY: data + protective advice only.
+  MONITOR
+  SUMMARY
+  BACKUP
+}
+
+enum ScanTrigger {
+  SCHEDULED
+  MANUAL
+  RECOVERY
+}
+
+enum NotificationStatus {
+  SENT
+  FAILED
+  SUPPRESSED
+  /// Milestone 5C: claimed before sending (at-most-once). A PENDING row left by a
+  /// crash becomes FAILED (UNKNOWN_DELIVERY) and is never re-sent.
+  PENDING
+}
+
+enum DataGapKind {
+  SNAPSHOT
+  CANDLE
+}
+
+enum DataGapStatus {
+  OPEN
+  BACKFILLED
+  PERMANENT
 }
 
 model User {
@@ -287,12 +332,113 @@ model ScheduledScan {
   id          Int        @id @default(autoincrement())
   /// Null means a full watchlist scan.
   pair        String?
+  /// The slot time this run belongs to (candle close + settle for scans).
   scheduledAt DateTime   @map("scheduled_at")
   status      ScanStatus @default(PENDING)
   retryCount  Int        @default(0) @map("retry_count")
 
+  // Milestone 5 (additive).
+  kind       ScanKind    @default(STRATEGY_SCAN)
+  trigger    ScanTrigger @default(SCHEDULED)
+  /// "ALL" for watchlist-wide runs, else the pair: one run per (kind, scope, slot).
+  scope      String      @default("ALL")
+  startedAt  DateTime?   @map("started_at")
+  finishedAt DateTime?   @map("finished_at")
+  /// Why a run was skipped/missed/failed (PAUSED, OFFLINE, SLEEP, LATE, CLOCK_SKEW, API_ERROR, …).
+  cause      String?
+  error      String?
+  summary    Json?
+
+  items ScanRunItem[]
+
+  @@unique([kind, scope, scheduledAt])
   @@index([status, scheduledAt])
+  @@index([kind, scheduledAt])
   @@map("scheduled_scans")
+}
+
+/// Milestone 5: per-pair outcome of a scheduler run, linking the run to the
+/// market snapshot and signal it produced (for M7 paper-trading evaluation).
+model ScanRunItem {
+  id               BigInt             @id @default(autoincrement())
+  scanId           Int                @map("scan_id")
+  pair             String
+  /// OK, FAILED, SKIPPED
+  status           String
+  decision         SignalDecision?
+  signalId         Int?               @map("signal_id")
+  marketSnapshotId BigInt?            @map("market_snapshot_id")
+  qualityStatus    DataQualityStatus? @map("quality_status")
+  error            String?
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  scan ScheduledScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([pair, createdAt])
+  @@index([signalId])
+  @@map("scan_run_items")
+}
+
+/// Milestone 5: every notification decision, sent or not. The dedup key makes
+/// each event deliverable at most once.
+model Notification {
+  id                Int                @id @default(autoincrement())
+  kind              String
+  pair              String?
+  signalId          Int?               @map("signal_id")
+  dedupKey          String             @unique @map("dedup_key")
+  status            NotificationStatus
+  suppressedReason  String?            @map("suppressed_reason")
+  /// Template name; the full text is not stored, only its hash.
+  template          String
+  textHash          String?            @map("text_hash")
+  telegramMessageId BigInt?            @map("telegram_message_id")
+  aiUsed            Boolean            @default(false) @map("ai_used")
+  aiRejectedReason  String?            @map("ai_rejected_reason")
+  error             String?
+  /// Telegram send attempts (429 retries included).
+  attempts          Int                @default(0)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  sentAt            DateTime?          @map("sent_at")
+
+  @@index([kind, createdAt])
+  @@index([pair, kind, createdAt])
+  @@map("notifications")
+}
+
+/// Milestone 5: periods without data. Missing data is recorded, never assumed complete.
+model DataGap {
+  id         Int           @id @default(autoincrement())
+  kind       DataGapKind
+  pair       String
+  /// Candle timeframe code, or "-" for snapshots.
+  timeframe  String        @default("-")
+  gapStart   DateTime      @map("gap_start")
+  gapEnd     DateTime      @map("gap_end")
+  cause      String
+  status     DataGapStatus @default(OPEN)
+  detectedAt DateTime      @default(now()) @map("detected_at")
+  resolvedAt DateTime?     @map("resolved_at")
+  details    Json?
+
+  @@unique([kind, pair, timeframe, gapStart])
+  @@index([pair, gapStart])
+  @@map("data_gaps")
+}
+
+/// Milestone 5: single-row scheduler heartbeat (id = 1), used to tell an
+/// offline period from a sleeping process after a restart.
+model SchedulerState {
+  id              Int       @id
+  instanceId      String    @map("instance_id")
+  startedAt       DateTime  @map("started_at")
+  lastHeartbeatAt DateTime  @map("last_heartbeat_at")
+  lastSlotAt      DateTime? @map("last_slot_at")
+  clockStatus     String?   @map("clock_status")
+  clockSkewMs     Int?      @map("clock_skew_ms")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("scheduler_state")
 }
 
 model AuditLog {

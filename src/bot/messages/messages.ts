@@ -40,6 +40,37 @@ export interface StatusView {
   timeZone: string;
   components: ComponentHealth[];
   ai: { enabled: boolean; disabledReason?: string | undefined };
+  /** Milestone 5 scheduler state; absent → "belum aktif". */
+  scheduler?: SchedulerStatusView | undefined;
+}
+
+export interface SchedulerStatusView {
+  running: boolean;
+  paused: boolean | null;
+  lockHeld: boolean;
+  clock: { status: 'UNKNOWN' | 'VALID' | 'INVALID'; skewMs: number | null; checkedAt: Date | null };
+  nextSlotAt: Date | null;
+  nextSlotKind: string | null;
+  lastRun: { kind: string; status: string; slotAt: Date; cause: string | null } | null;
+  consecutiveFailures: number;
+  breakerOpen: boolean;
+  requests: { lastHour: number; peakPerMinute: number; limitPerMinute: number };
+}
+
+const CLOCK_TEXT = { VALID: 'valid', INVALID: 'TIDAK VALID — keputusan & penyimpanan data ditahan', UNKNOWN: 'belum terverifikasi — keputusan ditahan' };
+
+function schedulerLines(s: SchedulerStatusView, timeZone: string): string[] {
+  const skew = s.clock.skewMs === null ? '' : ` (selisih ${(s.clock.skewMs / 1000).toFixed(1)} dtk)`;
+  return [
+    'SCHEDULER',
+    `${s.running && s.lockHeld ? '✅' : '❌'} Scheduler: ${s.running ? 'berjalan' : 'berhenti'}${s.lockHeld ? '' : ' — lock instance tidak dipegang'}`,
+    `${s.paused ? '⏸' : '▶️'} Scan strategi: ${s.paused === null ? 'tidak diketahui' : s.paused ? 'DIJEDA (/resume) — data tetap dikumpulkan' : 'aktif'}`,
+    `${s.clock.status === 'VALID' ? '✅' : '⛔'} Jam: ${CLOCK_TEXT[s.clock.status]}${skew}`,
+    `Slot berikutnya: ${s.nextSlotAt ? `${formatTime(s.nextSlotAt, timeZone)} (${s.nextSlotKind === 'STRATEGY_SCAN' ? 'scan strategi' : 'pengumpulan data'})` : '-'}`,
+    `Run terakhir: ${s.lastRun ? `${formatTime(s.lastRun.slotAt, timeZone)} ${s.lastRun.kind} ${s.lastRun.status}${s.lastRun.cause ? ` (${s.lastRun.cause})` : ''}` : '-'}`,
+    `Gagal beruntun: ${s.consecutiveFailures}${s.breakerOpen ? ' — circuit breaker aktif (tanpa retry)' : ''}`,
+    `Request Indodax: ${s.requests.lastHour}/jam · puncak ${s.requests.peakPerMinute}/menit (batas ${s.requests.limitPerMinute})`,
+  ];
 }
 
 export function statusMessage(view: StatusView): string {
@@ -62,7 +93,7 @@ export function statusMessage(view: StatusView): string {
     aiLine,
     '',
     'Mode: analisis saja — tidak ada eksekusi order.',
-    'Scanner otomatis: belum aktif (Milestone 5).',
+    ...(view.scheduler ? ['', ...schedulerLines(view.scheduler, view.timeZone)] : ['Scanner otomatis: belum aktif (Milestone 5).']),
   ].join('\n');
 }
 
